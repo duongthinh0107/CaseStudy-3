@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Render</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.0.0/dist/css/bootstrap.min.css"
+          integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+</head>
+<body>
+<div class="container">
+<nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-3">
+    <a class="navbar-brand" href="/">Navbar</a>
+    <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <div class="collapse navbar-collapse" id="navbarSupportedContent">
+        <ul class="navbar-nav mr-auto">
+            <li class="nav-item active">
+                <a class="nav-link" href="">Home <span class="sr-only">(current)</span></a>
+            </li>
+            <li class="nav-item active">
+                <a class="nav-link" href="/render">About <span class="sr-only">(current)</span></a>
+            </li>
+        </ul>
+        <a href="/login" class="btn btn-primary my-2 my-sm-0" style="color: white" >Logout</a>
+
+
+</nav>
+<!--Table-->
+    <div class="card">
+        <div class="card-header">
+            Quản lý sản phẩm
+        </div>
+        <div class="card-body">
+            <a href="/add" class="btn btn-success">Thêm mới</a>
+            <table class="table table-hover table-fixed mt-2">
+                <!--Table head-->
+                <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Name</th>
+                    <th>Type</th>
+                    <th>Price</th>
+                    <th>Detail</th>
+                <th></th>
+                <tbody>
+                {render}
+                </tbody>
+                <!--Table body-->
+            </table>
+        </div>
+    </div>
+    {page}
+
+</div>
+</body>
+</html>
