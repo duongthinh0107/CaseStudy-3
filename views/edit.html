@@ -38,10 +38,13 @@
     </nav>
     <div class="card card-body">
         <h3>Update product</h3>
-        <form action="" method="post" id="form">
+        <form action="" method="post" id="form" enctype="multipart/form-data">
             <div class="form-group">
                 <label for="name">Name</label>
                 <input type="text" id="name" name="nameEdit"></div>
+            <div class="form-group">
+                <label for="name">Image</label>
+                <input type="file" name="avatar" id="avatar"></div>
             <div class="form-group">
                 <label for="type">Type</label>
                 <input type="text" id="type" name="typeEdit"></div>

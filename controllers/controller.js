@@ -17,10 +17,7 @@ module.exports = {
     },
     add: (req, res) => {
 
-        var form = new formidable.IncomingForm();
-
-        // form.parse analyzes the incoming stream data, picking apart the different fields and files for you.
-
+        let form = new formidable.IncomingForm();
         form.parse(req, function (err, fields, files) {
 
             if (err) {
@@ -76,7 +73,7 @@ module.exports = {
   style="width: 150px;" alt=""></td>`;
                                 html += `<td>${data.name}</td>`;
                                 html += `<td>${data.type}</td>`;
-                                html += `<td>${data.price}</td>`;
+                                html += `<td>${data.price} VNĐ</td>`;
                                 html += `<td>${data.detail}</td>`;
                                 html += `<td><a class="btn btn-primary"href="/product/edit?id=${data.id}">Edit</a><a class="btn btn-danger"href="/product/delete-data?id=${data.id}">Delete</a></td>`
                                 html += `</tr>`;
@@ -131,19 +128,34 @@ module.exports = {
         });
     },
     edit: (req, res) => {
-        let data = '';
-        req.on('data', (chunk) => data += chunk);
-        req.on('end', () => {
-            let url1 = url.parse(req.url, true)
-            let id = (qs.parse(url1.query)).id;
-            let dataEdit = qs.parse(data);
-            models.edit(dataEdit, id)
+
+        let form = new formidable.IncomingForm();
+        form.parse(req, function (err, fields, files) {
+
+            if (err) {
+                console.error(err.message);
+                return;
+            }
+            form.uploaddir = 'public/upload/'
+            let urlPath = url.parse(req.url, true)
+            let id = (qs.parse(urlPath.query)).id;
+            let tmpPath = files.avatar.filepath;
+            let newPath = form.uploaddir + files.avatar.originalFilename;
+            let avatarPath = form.uploaddir + files.avatar.originalFilename;
+            models.edit({...fields, avatarPath},id)
                 .then(result => {
-                    res.writeHead(301, {
-                        Location: '/product/render'
-                    });
-                    res.end();
                 })
+            fs.rename(tmpPath, newPath, (err) => {
+                if (err) throw err;
+                let fileType = files.avatar.mimeType;
+                let mimeTypes = ["image/jpeg", "image/jpg", "image/png"];
+                if (mimeTypes.indexOf(fileType) === -1) {
+                    res.writeHead(200, {"Content-Type": "text/html"});
+                    return res.end('The file is not in the correct format: png, jpeg, jpg');
+                }
+            });
+            res.writeHead(301, {location: '/product/render'})
+            res.end();
         })
     },
     login: (req, res) => {
@@ -287,7 +299,7 @@ module.exports = {
     },
     home: (req, res) => {
         models.pagination()
-            .then(result=>{
+            .then(result => {
                 let offset = 0;
                 let a = Math.ceil(result[0].count / 5);
                 let currentPage = 1;
@@ -307,7 +319,7 @@ module.exports = {
                                 html += `<td><img src="${data.avatarPath}" class="rounded-circle mb-3" style="width: 150px;" alt=""></td>`;
                                 html += `<td>${data.name}</td>`
                                 html += `<td>${data.type}</td>`
-                                html += `<td>${data.price}</td>`
+                                html += `<td>${data.price} VNĐ</td>`
                                 html += `<td>${data.detail}</td>`
                                 html += `<td><a href="">Add</a></td>`
                                 html += `</tr>`;
@@ -349,7 +361,6 @@ module.exports = {
                 return (curPage - 1) * 5;
             })
     },
-
 
 
 };

@@ -32,8 +32,8 @@ module.exports = {
             });
         });
     },
-    edit: (data, id) => {
-        const editSql = `UPDATE products SET name = '${data.nameEdit}',type = '${data.typeEdit}', price = ${Number(data.priceEdit)}, detail = '${data.detailEdit}' WHERE products.id = '${id}'`;
+    edit: (data,id) => {
+        const editSql = `UPDATE products SET name = '${data.nameEdit}',type = '${data.typeEdit}', price = ${Number(data.priceEdit)}, detail = '${data.detailEdit}', avatarPath = '${data.avatarPath}' WHERE products.id = '${id}'`;
         return new Promise((resolve, reject) => {
             conn.query(editSql, err => {
                 if (err) reject(err);
@@ -85,6 +85,7 @@ module.exports = {
                 resolve(data)
             })
         })
-    }
+    },
+
 
 }
