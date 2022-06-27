@@ -1,8 +1,10 @@
 const conn = require('../db/conectDB')
+const {resolve} = require("path");
 
 module.exports = {
-    select: () => {
-        const select = 'SELECT * FROM products';
+    select: (offset) => {
+        const select = `SELECT * FROM products LIMIT 5 OFFSET ${offset}` ;
+        console.log(select)
         return new Promise((resolve, reject) => {
             conn.query(select, (err, result) => {
                 if (err) throw Error(err.message);
@@ -11,7 +13,7 @@ module.exports = {
         })
     },
     add: (data) => {
-        const insertSql = `INSERT INTO products(name,type,price,detail) VALUES('${data.name}','${data.type}',${Number(data.price)},'${data.detail}')`
+        const insertSql = `INSERT INTO products(name,type,price,detail,avatarPath) VALUES('${data.name}','${data.type}',${Number(data.price)},'${data.detail}','${data.avatarPath}')`
         return new Promise((resolve, reject) => {
             conn.query(insertSql, err => {
                 if (err) {
@@ -31,7 +33,7 @@ module.exports = {
         });
     },
     edit: (data, id) => {
-        const editSql = `UPDATE products SET name = '${data.nameEdit}',type = ${data.typeEdit}, price = ${Number(data.priceEdit)}, detail = '${data.detailEdit}' WHERE products.id = '${id}'`;
+        const editSql = `UPDATE products SET name = '${data.nameEdit}',type = '${data.typeEdit}', price = ${Number(data.priceEdit)}, detail = '${data.detailEdit}' WHERE products.id = '${id}'`;
         return new Promise((resolve, reject) => {
             conn.query(editSql, err => {
                 if (err) reject(err);
@@ -66,6 +68,23 @@ module.exports = {
             })
         })
 
+    },
+    getUserName: ()=>{
+        const getUserName = `SELECT username FROM account`;
+        return new Promise((resolve, reject) => {
+            conn.query(getUserName,(err,data)=>{
+                if (err) reject(err);
+                resolve(data);
+            })
+        })
+    },
+    pagination: ()=>{
+        const getCount = `SELECT COUNT(id) as count from products`;
+        return new Promise((resolve,reject)=>{
+            conn.query(getCount,(err,data)=>{
+                resolve(data)
+            })
+        })
     }
 
 }

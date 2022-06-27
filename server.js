@@ -6,6 +6,7 @@ const sessionControllers = require('./controllers/sessionControllers')
 const url = require("url");
 const fs = require('fs');
 const path2 = require('path');
+const cookie = require("cookie");
 
 const mimeTypes = {
     "html": "text/html",
@@ -30,18 +31,27 @@ conn.connect(err => {
 const server = http.createServer((req, res) => {
     let parseUrl = url.parse(req.url, true);
     if (parseUrl.pathname === '/') {
-        controllers.readFile('./views/home.html', 200, res);
+        controllers.readFile('./views/login.html', 200, res);
+    }
+    if(parseUrl.pathname.includes(('/product'))) {
+        if(!controllers.checkLogin(req,res)){
+            res.writeHead(301,{location: '/login'})
+            res.end();
+        }
     }
     const filesDefences = req.url.match(/\.js$|.css$|.jpeg$|.svg$|.png$|.jpg$/);
     if (filesDefences) {
         const extension = mimeTypes[filesDefences[0].toString().split('.')[1]];
-        res.writeHead(200, { 'Content-Type': extension });
+        res.writeHead(200, {'Content-Type': extension});
         let fileName = path2.basename(req.url)
-        let pathSrc = path2.join("./","public", fileName);
-
-        fs.createReadStream(pathSrc).pipe(res)
+        if (extension==='image/jpeg' || extension === 'image/jpg' || extension === 'image/png'){
+            let pathSrc = `public/upload/${fileName}`
+            fs.createReadStream(pathSrc).pipe(res)
+        }else {
+            let pathSrc = path2.join("./", "public", fileName);
+            fs.createReadStream(pathSrc).pipe(res)
+        }
     }
-
 
 
     let path = parseUrl.pathname;
@@ -61,7 +71,7 @@ server.listen(PORT, () => {
 let handlers = {};
 
 handlers.home = (req, res) => {
-    controllers.home(req,res)
+    controllers.home(req, res)
 }
 
 handlers.login = (req, res) => {
@@ -71,7 +81,7 @@ handlers.login = (req, res) => {
         if (req.method === 'GET') {
             controllers.readFile('./views/login.html', 200, res);
         } else {
-            controllers.login(req, res);
+            controllers.login2(req, res);
         }
     }
 };
@@ -85,13 +95,18 @@ handlers.register = (req, res) => {
 }
 
 handlers.add = (req, res) => {
-    if (req.method === 'GET') {
-        controllers.readFile('./views/add.html', 200, res);
-    } else {
-        controllers.add(req, res);
-    }
-};
+        if (req.method === 'GET') {
+            controllers.readFile('./views/add.html', 200, res);
+        } else {
+            // controllers.uploadFile(req,res);
+            controllers.add(req, res);
+        }
 
+};
+// handlers.getFile = (req, res) => {
+//     controllers.getFile(req, res);
+//
+// };
 handlers.edit = (req, res) => {
     if (req.method === 'GET') {
         controllers.getEdit(req, res);
@@ -108,24 +123,19 @@ handlers.delete = (req, res) => {
     controllers.delete(req, res);
 };
 
-handlers.upload = (req, res) => {
-    controllers.upload(req,res)
-}
-
-
 handlers.notFound = (req, res) => {
     controllers.readFile('./views/404.html', 404, res);
 };
 
 
 const router = {
-    'home': handlers.home,
+    'product/home': handlers.home,
     'login': handlers.login,
-    'add': handlers.add,
-    'edit': handlers.edit,
-    'render': handlers.render,
-    'delete-data': handlers.delete,
+    'product/add': handlers.add,
+    'product/edit': handlers.edit,
+    'product/render': handlers.render,
+    'product/delete-data': handlers.delete,
     'register': handlers.register,
-    'upload-image': handlers.upload
+    // 'product/getFile' :handlers.getFile
 };
 

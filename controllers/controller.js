@@ -4,7 +4,8 @@ const qs = require("qs");
 const url = require("url");
 let formidable = require('formidable');
 const sessionControllers = require('./sessionControllers')
-const cookie = require("qs");
+const cookie = require("cookie");
+const util = require('util');
 
 module.exports = {
     readFile: (path, statusCode, res) => {
@@ -15,57 +16,84 @@ module.exports = {
         });
     },
     add: (req, res) => {
-        let data = '';
-        req.on('data', chunk => data += chunk)
-        req.on('end', () => {
-            let data1 = qs.parse(data);
-            models.add(data1)
+
+        var form = new formidable.IncomingForm();
+
+        // form.parse analyzes the incoming stream data, picking apart the different fields and files for you.
+
+        form.parse(req, function (err, fields, files) {
+
+            if (err) {
+                console.error(err.message);
+                return;
+            }
+            form.uploaddir = 'public/upload/'
+            let tmpPath = files.avatar.filepath;
+            let newPath = form.uploaddir + files.avatar.originalFilename;
+            let avatarPath = form.uploaddir + files.avatar.originalFilename;
+            models.add({...fields, avatarPath})
                 .then(result => {
-                    res.writeHead(301, {
-                        Location: '/render' // This is your url which you want
-                    });
-                    res.end();
                 })
-        })
+            fs.rename(tmpPath, newPath, (err) => {
+                if (err) throw err;
+                let fileType = files.avatar.mimeType;
+                let mimeTypes = ["image/jpeg", "image/jpg", "image/png"];
+                if (mimeTypes.indexOf(fileType) === -1) {
+                    res.writeHead(200, {"Content-Type": "text/html"});
+                    return res.end('The file is not in the correct format: png, jpeg, jpg');
+                }
+            });
+            res.writeHead(301, {location: '/product/render'})
+            res.end();
+
+
+        });
+
     },
     render: (req, res) => {
-        let data = '';
-        req.on('data', chunk => data += chunk)
-        req.on('end', () => {
-            fs.readFile('./views/render.html', 'utf-8', (err, data) => {
-                models.select().then(result => {
-                    // let page = (url.parse(req.url).query)
-                    // let perPage = 5;
-                    // let start = (page - 1) * perPage;
-                    // let end = page * perPage;
-                    // result = result.slice(start, end);
-                    // console.log(page)
-                    let html = '';
-                    result.forEach((data, index) => {
-                        html += '<tr>';
-                        html += `<td>${index + 1}</td>`;
-                        html += `<td>${data.name}</td>`;
-                        html += `<td>${data.type}</td>`;
-                        html += `<td>${data.price}</td>`;
-                        html += `<td>${data.detail}</td>`;
-                        html += `<td><a class="btn btn-primary"href="/edit?id=${data.id}">Edit</a><a class="btn btn-danger"href="/delete-data?id=${data.id}">Delete</a></td>`
-                        html += `</tr>`;
-                    })
-                    // let htmlPage = '';
-                    // htmlPage += `<nav aria-label="Page navigation example">`
-                    // htmlPage += `        <ul class="pagination">`
-                    // htmlPage += `<li class="page-item"><a class="page-link" href="render?=${perPage -1}">Previous</a></li>`
-                    // htmlPage += `<li class="page-item"><a class="page-link" href="${perPage + 1}">Next</a></li>`
-                    // htmlPage += `</ul>`
-                    // htmlPage += `</nav>`
-                    data = data.replace('{render}', html);
-                    // data = data.replace('{page}', htmlPage);
-                    res.writeHead(200, {'Content-type': 'text/html'});
-                    res.write(data);
-                    res.end();
+        models.pagination()
+            .then(result => {
+                let offset = 0;
+                let a = Math.ceil(result[0].count / 5);
+                let currentPage = 1;
+                if (url.parse(req.url).query) {
+                    currentPage = url.parse(req.url)?.query?.slice(5, 6)
+                    offset = (currentPage - 1) * 5;
+                }
+                let data = '';
+                req.on('data', chunk => data += chunk)
+                req.on('end', () => {
+                    fs.readFile('./views/render.html', 'utf-8', (err, data) => {
+                        models.select(offset).then(result => {
+                            let html = '';
+                            let htmlPage = '';
+
+                            result.forEach((data, index) => {
+
+                                html += '<tr>';
+                                html += `<td>${index + 1}</td>`;
+                                html += `<td><img src="${data.avatarPath}" class="rounded-circle mb-3"
+  style="width: 150px;" alt=""></td>`;
+                                html += `<td>${data.name}</td>`;
+                                html += `<td>${data.type}</td>`;
+                                html += `<td>${data.price}</td>`;
+                                html += `<td>${data.detail}</td>`;
+                                html += `<td><a class="btn btn-primary"href="/product/edit?id=${data.id}">Edit</a><a class="btn btn-danger"href="/product/delete-data?id=${data.id}">Delete</a></td>`
+                                html += `</tr>`;
+                            })
+                            htmlPage += `<li class="page-item"><a class="page-link" href="/product/render?page=${Number(currentPage) - 1}">Previous</a></li>
+                            <li class="page-item"><a class="page-link" href="/product/render?page=${Number(currentPage) + 1}">Next</a></li>`
+
+                            data = data.replace('{render}', html);
+                            data = data.replace('{page}', htmlPage);
+                            res.writeHead(200, {'Content-type': 'text/html'});
+                            res.write(data);
+                            res.end();
+                        });
+                    });
                 });
-            });
-        });
+            })
+
     },
 
     delete: (req, res) => {
@@ -73,9 +101,8 @@ module.exports = {
         let id = (qs.parse(urlPath.query)).id;
         models.delete(id)
             .then(result => {
-                console.log(result)
                 res.writeHead(301, {
-                    Location: '/render'
+                    Location: '/product/render'
                 });
                 res.end();
             })
@@ -86,7 +113,6 @@ module.exports = {
             let id = (qs.parse(url1.query)).id;
             models.getEdit(id)
                 .then(result => {
-                    console.log(result);
                     res.writeHead(200, {'content-type': 'text/html'})
                     dataEdit = dataEdit.replace('<input type="text" id="name" name="nameEdit">',
                         `<input type="text" name="nameEdit" id="name" value ='${result[0].name}'>`
@@ -111,12 +137,10 @@ module.exports = {
             let url1 = url.parse(req.url, true)
             let id = (qs.parse(url1.query)).id;
             let dataEdit = qs.parse(data);
-            console.log(dataEdit)
             models.edit(dataEdit, id)
                 .then(result => {
-                    console.log(result);
                     res.writeHead(301, {
-                        Location: '/render'
+                        Location: '/product/render'
                     });
                     res.end();
                 })
@@ -124,15 +148,12 @@ module.exports = {
     },
     login: (req, res) => {
         if (req.method === 'GET') {
-
             let cookies = (cookie.parse(req.headers.cookie || ''))
-            console.log(cookies)
             let nameCookie = '';
             if (cookies.cookie_user) {
                 nameCookie = (JSON.parse(cookies.cookie_user)).session_name_file
                 fs.exists('./token/' + nameCookie + '.txt', (exists) => {
                     if (exists) {
-                        console.log(exists)
                         res.writeHead(301, {location: '/render'});
                         res.end();
                     } else {
@@ -144,39 +165,102 @@ module.exports = {
 
                 this.readFile('./views/login.html',)
             }
+        } else {
+            let data = '';
+            req.on('data', (chunk) => data += chunk);
+            req.on('end', () => {
+                let dataLogin = qs.parse(data);
+                models.checkAccount(dataLogin)
+                    .then(result => {
+                        if (result.length > 0) {
+                            let nameFile = Date.now();
+                            let sessionLogin = {
+                                'session_name_file': nameFile,
+                                'data_user_login': result[0]
+                            };
+                            let cookieLogin = {
+                                'session_name_file': nameFile
+                            }
+                            res.setHeader('Set-Cookie', cookie.serialize('cookie_user', JSON.stringify(cookieLogin)));
+                            if (result[0].role === '1') {
+                                res.writeHead(301, {location: '/home'})
+                                res.end();
+                            } else if (result[0].role === '2') {
+                                res.writeHead(301, {location: '/render'})
+                                res.end();
+                            }
+                            fs.writeFile('./token/' + nameFile, JSON.stringify(sessionLogin), err => {
+                                if (err) {
+                                    throw new Error(err.message);
+                                }
+                            })
+                        } else {
+                            fs.readFile('./views/login.html', 'utf-8', (err, data) => {
+                                data = data.replace('<small hidden>hi</small>', '<small style="color: red">Wrong username!!</small>');
+                                data = data.replace('<small hidden>ha</small>', '<small style="color: red">Wrong password!!</small>');
+                                res.writeHead(301, {
+                                    Location: '/login'
+                                });
+                                res.writeHead(200, {'Content-type': 'text/html'})
+                                res.write(data);
+                                res.end();
+                            })
+                        }
+                    })
+            })
         }
-        let data = '';
-        req.on('data', (chunk) => data += chunk);
-        req.on('end', () => {
-            let dataLogin = qs.parse(data);
-            console.log(dataLogin)
-            models.checkAccount(dataLogin)
-                .then(result => {
-                    console.log(result)
-                    if (result.length > 0 && result[0].role === '1') {
-                        res.writeHead(301, {
-                            Location: '/home'
-                        });
-                        res.end();
-                    } else if (result.length > 0 && result[0].role === '2') {
-                        res.writeHead(301, {
-                            Location: '/render'
-                        });
-                        res.end();
-                    } else {
-                        fs.readFile('./views/login.html', 'utf-8', (err, data) => {
-                            data = data.replace('<small hidden>hi</small>', '<small style="color: red">Wrong username!!</small>');
-                            data = data.replace('<small hidden>ha</small>', '<small style="color: red">Wrong password!!</small>');
-                            res.writeHead(301, {
-                                Location: '/login'
-                            });
-                            res.writeHead(200, {'Content-type': 'text/html'})
-                            res.write(data);
-                            res.end();
-                        })
-                    }
-                })
-        })
+    },
+    login2: (req, res) => {
+        if (req.method === 'GET') {
+            fs.readFile('./views/login.html', 'utf8', ((err, data) => {
+                if (err) {
+                    throw new Error(err.message)
+                }
+
+                res.writeHead(200, {'Content-type': 'text/html'})
+                res.write(data);
+                res.end();
+            }))
+        } else {
+            let data = '';
+            req.on('data', chunk => data += chunk);
+            req.on('end', () => {
+                let dataLogin = qs.parse(data);
+                models.checkAccount(dataLogin)
+                    .then(result => {
+                        if (result.length > 0) {
+                            let sessionUser = {
+                                sessionLogin: {
+                                    user: {
+                                        name: dataLogin.name,
+                                        email: dataLogin.email,
+                                    }
+                                }
+                            }
+                            let nameFileSession = Date.now();
+                            fs.writeFile(`./token/${nameFileSession}.txt`, JSON.stringify(sessionUser), err => {
+                                if (err) {
+                                    throw new Error(err.message)
+                                }
+                                console.log('created session success!')
+                            })
+
+                            let cookieOfSession = {
+                                name_file_session: nameFileSession
+                            }
+
+                            res.setHeader('set-cookie', cookie.serialize('name', JSON.stringify(cookieOfSession)))
+                            if (result[0].role === '1') {
+                                res.writeHead(301, {Location: '/product/home'})
+                                res.end()
+                            } else {
+                                res.writeHead(301, {Location: '/product/render'})
+                                res.end()
+                            }
+                        }
+                    })
+            })
+        }
     },
     register: (req, res) => {
         let data = '';
@@ -194,7 +278,6 @@ module.exports = {
             })
             models.addAccount(dataRegister)
                 .then(result => {
-                    console.log(result);
                     res.writeHead(301, {
                         Location: '/login'
                     });
@@ -202,51 +285,71 @@ module.exports = {
                 })
         });
     },
-    upload: (req, res) => {
-        let form = new formidable.IncomingForm();
-        //parse a file upload
-        form.uploadDir = "./uploads";
-        form.keepExtension = true;
-        form.maxFieldsSize = 10 * 1024 * 1024;// 10mb
-        form.multiples = true;
-        form.parse(req, (err, field, files) => {
-            let arrOfImages = files[""];
-            if (arrOfImages.length > 0) {
-                let arr = [];
-                arr.forEach(eachFile => {
-                    arr.push(eachFile.path);
-                })
-                res.end('ok')
-            } else {
-                res.end('err')
-            }
-        })
-    },
     home: (req, res) => {
-        let data = '';
-        req.on('data', chunk => data += chunk)
-        req.on('end', () => {
-            fs.readFile('./views/home.html', 'utf-8', (err, data) => {
-                models.select().then(result => {
-                    console.log(result)
-                    let html = '';
-                    result.forEach((data, index) => {
-                        html += `<tr>`;
-                        html += `<td>${index + 1}</td>`
-                        html += `<td>${data.name}</td>`
-                        html += `<td>${data.type}</td>`
-                        html += `<td>${data.price}</td>`
-                        html += `<td>${data.detail}</td>`
-                        html += `<td><a href="">Add</a></td>`
-                        html += `</tr>`;
-                    })
-                    data = data.replace('{render}', html);
-                    res.writeHead(200, {'Content-type': 'text/html'});
-                    res.write(data);
-                    res.end();
+        models.pagination()
+            .then(result=>{
+                let offset = 0;
+                let a = Math.ceil(result[0].count / 5);
+                let currentPage = 1;
+                if (url.parse(req.url).query) {
+                    currentPage = url.parse(req.url)?.query?.slice(5, 6)
+                    offset = (currentPage - 1) * 5;
+                }
+                let data = '';
+                req.on('data', chunk => data += chunk)
+                req.on('end', () => {
+                    fs.readFile('./views/home.html', 'utf-8', (err, data) => {
+                        models.select(offset).then(result => {
+                            let html = '';
+                            result.forEach((data, index) => {
+                                html += `<tr>`;
+                                html += `<td>${index + 1}</td>`
+                                html += `<td><img src="${data.avatarPath}" class="rounded-circle mb-3" style="width: 150px;" alt=""></td>`;
+                                html += `<td>${data.name}</td>`
+                                html += `<td>${data.type}</td>`
+                                html += `<td>${data.price}</td>`
+                                html += `<td>${data.detail}</td>`
+                                html += `<td><a href="">Add</a></td>`
+                                html += `</tr>`;
+                            })
+                            let htmlPage = ''
+                            htmlPage += `<li class="page-item"><a class="page-link" href="/product/home?page=${Number(currentPage) - 1}">Previous</a></li>
+                            <li class="page-item"><a class="page-link" href="/product/home?page=${Number(currentPage) + 1}">Next</a></li>`
+                            data = data.replace('{render}', html);
+                            data = data.replace('{page}', htmlPage);
+
+                            res.writeHead(200, {'Content-type': 'text/html'});
+                            res.write(data);
+                            res.end();
+                        });
+                    });
                 });
-            });
-        });
+
+            })
+
     },
+    checkLogin: (req, res) => {
+        let cookieReq = req.headers.cookie
+
+        if (cookieReq) {
+            let cookieObj = cookie.parse(cookieReq);
+            if (cookieObj.name) {
+                return true;
+
+            }
+            return false
+        }
+        return false;
+    },
+    pagination: (req, res) => {
+        models.pagination()
+            .then(result => {
+                let a = result[0].count / 5;
+                let curPage = url.parse(req.url).query.slice(5, 6)
+                return (curPage - 1) * 5;
+            })
+    },
+
+
 
 };
